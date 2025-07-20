@@ -1,122 +1,145 @@
 import os
-import re
-
 import aiofiles
 import aiohttp
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
-from unidecode import unidecode
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageStat
 from youtubesearchpython.__future__ import VideosSearch
+from config import FAILED
 
-from Lyka import app
-from config import YOUTUBE_IMG_URL
+# Constants
+CACHE_DIR = "cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
 
+WIDTH, HEIGHT = 800, 450
+FONT_PATH_TITLE = "CherryMiso/assets/font.ttf"
+FONT_PATH_META = "CherryMiso/assets/cfont.ttf"
+FALLBACK_PATH = "CherryMiso/assets/fallback.jpg"
 
-def changeImageSize(maxWidth, maxHeight, image):
-    widthRatio = maxWidth / image.size[0]
-    heightRatio = maxHeight / image.size[1]
-    newWidth = int(widthRatio * image.size[0])
-    newHeight = int(heightRatio * image.size[1])
-    newImage = image.resize((newWidth, newHeight))
-    return newImage
+def truncate_text(text, font, max_width):
+    if font.getlength(text) <= max_width:
+        return text
+    ellipsis = "..."
+    for i in range(len(text), 0, -1):
+        truncated = text[:i].strip() + ellipsis
+        if font.getlength(truncated) <= max_width:
+            return truncated
+    return ellipsis
 
+def is_bright(image: Image.Image) -> bool:
+    stat = ImageStat.Stat(image.convert("L"))
+    return stat.mean[0] > 130  # brightness threshold
 
-def clear(text):
-    list = text.split(" ")
-    title = ""
-    for i in list:
-        if len(title) + len(i) < 60:
-            title += " " + i
-    return title.strip()
+async def gen_thumb(videoid: str) -> str:
+    cache_path = os.path.join(CACHE_DIR, f"{videoid}_lyka.png")
+    if os.path.exists(cache_path):
+        return cache_path
 
-
-async def get_thumb(videoid):
-    if os.path.isfile(f"cache/{videoid}.png"):
-        return f"cache/{videoid}.png"
-
-    url = f"https://www.youtube.com/watch?v={videoid}"
+    results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
     try:
-        results = VideosSearch(url, limit=1)
-        for result in (await results.next())["result"]:
-            try:
-                title = result["title"]
-                title = re.sub("\W+", " ", title)
-                title = title.title()
-            except:
-                title = "Unsupported Title"
-            try:
-                duration = result["duration"]
-            except:
-                duration = "Unknown Mins"
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            try:
-                views = result["viewCount"]["short"]
-            except:
-                views = "Unknown Views"
-            try:
-                channel = result["channel"]["name"]
-            except:
-                channel = "Unknown Channel"
+        data = (await results.next())["result"][0]
+        title = data.get("title", "Unknown Title")
+        channel = data.get("channel", {}).get("name", "Unknown Channel")
+        thumbnail = data.get("thumbnails", [{}])[0].get("url", FAILED)
+        duration = data.get("duration") or "Live"
+    except Exception:
+        title, channel, thumbnail, duration = "Unknown Title", "Unknown Channel", FAILED, "Live"
 
+    is_live = duration.strip().lower() in {"", "live", "live now"}
+    duration_text = "Live" if is_live else duration
+
+    thumb_path = os.path.join(CACHE_DIR, f"thumb_{videoid}.png")
+    try:
         async with aiohttp.ClientSession() as session:
             async with session.get(thumbnail) as resp:
                 if resp.status == 200:
-                    f = await aiofiles.open(f"cache/thumb{videoid}.png", mode="wb")
-                    await f.write(await resp.read())
-                    await f.close()
+                    async with aiofiles.open(thumb_path, "wb") as f:
+                        await f.write(await resp.read())
+    except Exception:
+        thumb_path = FALLBACK_PATH
 
-        youtube = Image.open(f"cache/thumb{videoid}.png")
-        image1 = changeImageSize(1280, 720, youtube)
-        image2 = image1.convert("RGBA")
-        background = image2.filter(filter=ImageFilter.BoxBlur(10))
-        enhancer = ImageEnhance.Brightness(background)
-        background = enhancer.enhance(0.5)
-        draw = ImageDraw.Draw(background)
-        arial = ImageFont.truetype("Lyka/assets/font2.ttf", 30)
-        font = ImageFont.truetype("Lyka/assets/font.ttf", 30)
-        draw.text((1110, 8), unidecode(app.name), fill="white", font=arial)
-        draw.text(
-            (55, 560),
-            f"{channel} | {views[:23]}",
-            (255, 255, 255),
-            font=arial,
-        )
-        draw.text(
-            (57, 600),
-            clear(title),
-            (255, 255, 255),
-            font=font,
-        )
-        draw.line(
-            [(55, 660), (1220, 660)],
-            fill="white",
-            width=5,
-            joint="curve",
-        )
-        draw.ellipse(
-            [(918, 648), (942, 672)],
-            outline="white",
-            fill="white",
-            width=15,
-        )
-        draw.text(
-            (36, 685),
-            "00:00",
-            (255, 255, 255),
-            font=arial,
-        )
-        draw.text(
-            (1185, 685),
-            f"{duration[:23]}",
-            (255, 255, 255),
-            font=arial,
-        )
-        try:
-            os.remove(f"cache/thumb{videoid}.png")
-        except:
-            pass
-        background.save(f"cache/{videoid}.png")
-        return f"cache/{videoid}.png"
-    except Exception as e:
-        print(e)
-        return YOUTUBE_IMG_URL
-        
+    try:
+        art = Image.open(thumb_path).resize((200, 200)).convert("RGBA")
+        background_art = Image.open(thumb_path).resize((WIDTH, HEIGHT)).convert("RGBA")
+    except Exception:
+        art = Image.open(FALLBACK_PATH).resize((200, 200)).convert("RGBA")
+        background_art = Image.open(FALLBACK_PATH).resize((WIDTH, HEIGHT)).convert("RGBA")
+
+    # Base background
+    bg = background_art.filter(ImageFilter.GaussianBlur(25))
+
+    # Panel details
+    card_x, card_y = 100, 100
+    card_w, card_h = 600, 250
+    card_radius = 50
+    panel_box = (card_x, card_y, card_x + card_w, card_y + card_h)
+
+    # Frosted glass panel
+    frosted = bg.crop(panel_box).filter(ImageFilter.GaussianBlur(6))
+    brightness_sample = frosted.copy().resize((1, 1))
+    panel_bright = is_bright(brightness_sample)
+
+    # Switch glass overlay to dark if bright (text color stays same)
+    overlay_color = (0, 0, 0, 100) if panel_bright else (255, 255, 255, 60)
+    overlay = Image.new("RGBA", (card_w, card_h), overlay_color)
+    panel = Image.alpha_composite(frosted, overlay)
+
+    # Rounded mask
+    mask = Image.new("L", (card_w, card_h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, card_w, card_h), card_radius, fill=255)
+
+    # Paste glass panel
+    bg.paste(panel, (card_x, card_y), mask)
+
+    draw = ImageDraw.Draw(bg)
+
+    # Text color (now fixed, no change)
+    text_color = (255, 255, 255)
+    subtext_color = (200, 200, 200)
+
+    # Fonts
+    try:
+        title_font = ImageFont.truetype(FONT_PATH_TITLE, 34)
+        meta_font = ImageFont.truetype(FONT_PATH_META, 28)
+        small_font = ImageFont.truetype(FONT_PATH_META, 24)
+    except OSError:
+        title_font = meta_font = small_font = ImageFont.load_default()
+
+    # Album Thumbnail
+    art_size = 140
+    thumb = art.resize((art_size, art_size))
+    thumb_mask = Image.new("L", (art_size, art_size), 0)
+    ImageDraw.Draw(thumb_mask).rounded_rectangle((0, 0, art_size, art_size), 40, fill=255)
+    thumb_x = card_x + 40
+    thumb_y = card_y + (card_h - art_size) // 2
+    bg.paste(thumb, (thumb_x, thumb_y), thumb_mask)
+
+    # Text
+    text_x = thumb_x + art_size + 40
+    max_title_width = card_w - (art_size + 120)
+
+    draw.text((text_x, card_y + 30), "Levy Vibez", font=small_font, fill=subtext_color)
+    draw.text((text_x, card_y + 70), truncate_text(title, title_font, max_title_width), font=title_font, fill=text_color)
+    draw.text((text_x, card_y + 120), channel.strip(), font=meta_font, fill=subtext_color)
+
+    # Play button
+    play_size = 44
+    p_x = text_x
+    p_y = card_y + 170
+
+    draw.ellipse((p_x, p_y, p_x + play_size, p_y + play_size), fill=text_color)
+    triangle = [
+        (p_x + 16, p_y + 12),
+        (p_x + 16, p_y + play_size - 12),
+        (p_x + play_size - 12, p_y + play_size // 2)
+    ]
+    triangle_fill = (240, 240, 240) if text_color == (30, 30, 30) else (30, 30, 40)
+    draw.polygon(triangle, fill=triangle_fill)
+
+    draw.text((p_x + play_size + 20, p_y + 8), f"00:00 — {duration_text}", font=small_font, fill=subtext_color)
+
+    try:
+        os.remove(thumb_path)
+    except Exception:
+        pass
+
+    bg.save(cache_path)
+    return cache_path
