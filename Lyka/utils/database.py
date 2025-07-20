@@ -1,4 +1,6 @@
 import random
+import asyncio
+from datetime import date
 from typing import Dict, List, Union
 
 from Lyka import userbot
@@ -7,13 +9,14 @@ from Lyka.core.mongo import mongodb
 authdb = mongodb.adminauth
 authuserdb = mongodb.authuser
 autoenddb = mongodb.autoend
+autoleavedb = mongodb.autoleave
 assdb = mongodb.assistants
 blacklist_chatdb = mongodb.blacklistChat
 blockeddb = mongodb.blockedusers
 chatsdb = mongodb.chats
+chatdb = mongodb.chat
 channeldb = mongodb.cplaymode
 countdb = mongodb.upcount
-connectdb = mongodb.connect
 gbansdb = mongodb.gban
 langdb = mongodb.language
 onoffdb = mongodb.onoffper
@@ -22,14 +25,13 @@ playtypedb = mongodb.playtypedb
 skipdb = mongodb.skipmode
 sudoersdb = mongodb.sudoers
 usersdb = mongodb.tgusersdb
-playlistdb = mongodb.playlist
-
 
 # Shifting to memory [mongo sucks often]
 active = []
 activevideo = []
 assistantdict = {}
 autoend = {}
+autoleave = {}
 count = {}
 channelconnect = {}
 langm = {}
@@ -40,76 +42,6 @@ pause = {}
 playmode = {}
 playtype = {}
 skipmode = {}
-playlist = []
-
-
-
-#connect 
-async def connect_to_chat(user_id: int, chat_id: int):
-    existing = await connectdb.find_one({'user_id': user_id, 'chat_id': chat_id})
-    if existing:
-        return True
-
-    result = await connectdb.update_one(
-        {'user_id': user_id},
-        {'$set': {'chat_id': chat_id}},
-        upsert=True
-    )
-    
-    
-    return result.modified_count > 0 or result.upserted_id is not None
- 
-async def get_connected_chat(user_id: int):
-    user = await connectdb.find_one({'user_id': user_id}, {'_id': 0, 'chat_id': 1})
-    return user['chat_id'] if user and 'chat_id' in user else False
-
-
-# Playlist
-
-async def _get_playlists(chat_id: int) -> Dict[str, int]:
-    _notes = await playlistdb.find_one({"chat_id": chat_id})
-    if not _notes:
-        return {}
-    return _notes["notes"]
-
-
-async def get_playlist_names(chat_id: int) -> List[str]:
-    _notes = []
-    for note in await _get_playlists(chat_id):
-        _notes.append(note)
-    return _notes
-
-
-async def get_playlist(chat_id: int, name: str) -> Union[bool, dict]:
-    name = name
-    _notes = await _get_playlists(chat_id)
-    if name in _notes:
-        return _notes[name]
-    else:
-        return False
-
-
-async def save_playlist(chat_id: int, name: str, note: dict):
-    name = name
-    _notes = await _get_playlists(chat_id)
-    _notes[name] = note
-    await playlistdb.update_one(
-        {"chat_id": chat_id}, {"$set": {"notes": _notes}}, upsert=True
-    )
-
-
-async def delete_playlist(chat_id: int, name: str) -> bool:
-    notesd = await _get_playlists(chat_id)
-    name = name
-    if name in notesd:
-        del notesd[name]
-        await playlistdb.update_one(
-            {"chat_id": chat_id},
-            {"$set": {"notes": notesd}},
-            upsert=True,
-        )
-        return True
-    return False
 
 
 async def get_assistant_number(chat_id: int) -> str:
@@ -140,7 +72,7 @@ async def set_assistant_new(chat_id, number):
 
 
 async def set_assistant(chat_id):
-    from Lyka.core.userbot import assistants
+    from CherryMiso.core.userbot import assistants
 
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
@@ -154,7 +86,7 @@ async def set_assistant(chat_id):
 
 
 async def get_assistant(chat_id: int) -> str:
-    from Lyka.core.userbot import assistants
+    from CherryMiso.core.userbot import assistants
 
     assistant = assistantdict.get(chat_id)
     if not assistant:
@@ -181,7 +113,7 @@ async def get_assistant(chat_id: int) -> str:
 
 
 async def set_calls_assistant(chat_id):
-    from Lyka.core.userbot import assistants
+    from CherryMiso.core.userbot import assistants
 
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
@@ -194,7 +126,7 @@ async def set_calls_assistant(chat_id):
 
 
 async def group_assistant(self, chat_id: int) -> int:
-    from Lyka.core.userbot import assistants
+    from CherryMiso.core.userbot import assistants
 
     assistant = assistantdict.get(chat_id)
     if not assistant:
@@ -285,6 +217,23 @@ async def autoend_on():
 async def autoend_off():
     chat_id = 1234
     await autoenddb.delete_one({"chat_id": chat_id})
+
+async def is_autoleave() -> bool:
+    chat_id = 1234
+    user = await autoleavedb.find_one({"chat_id": chat_id})
+    if not user:
+        return False
+    return True
+
+
+async def autoleave_on():
+    chat_id = 1234
+    await autoleavedb.insert_one({"chat_id": chat_id})
+
+
+async def autoleave_off():
+    chat_id = 1234
+    await autoleavedb.delete_one({"chat_id": chat_id})
 
 
 async def get_loop(chat_id: int) -> int:
@@ -546,10 +495,7 @@ async def get_served_chats() -> list:
     async for chat in chatsdb.find({"chat_id": {"$lt": 0}}):
         chats_list.append(chat)
     return chats_list
-    
-async def delete_served_chat(chat_id: int):
-    await chatsdb.delete_one({"chat_id": chat_id})
-        
+
 
 async def is_served_chat(chat_id: int) -> bool:
     chat = await chatsdb.find_one({"chat_id": chat_id})
