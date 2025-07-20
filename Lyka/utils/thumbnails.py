@@ -116,7 +116,7 @@ async def gen_thumb(videoid: str) -> str:
     text_x = thumb_x + art_size + 40
     max_title_width = card_w - (art_size + 120)
 
-    draw.text((text_x, card_y + 30), "Levy Vibez", font=small_font, fill=subtext_color)
+    draw.text((text_x, card_y + 30), "Beat Guard", font=small_font, fill=subtext_color)
     draw.text((text_x, card_y + 70), truncate_text(title, title_font, max_title_width), font=title_font, fill=text_color)
     draw.text((text_x, card_y + 120), channel.strip(), font=meta_font, fill=subtext_color)
 
