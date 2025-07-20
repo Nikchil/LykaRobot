@@ -10,9 +10,9 @@ CACHE_DIR = "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 WIDTH, HEIGHT = 800, 450
-FONT_PATH_TITLE = "CherryMiso/assets/font.ttf"
-FONT_PATH_META = "CherryMiso/assets/cfont.ttf"
-FALLBACK_PATH = "CherryMiso/assets/fallback.jpg"
+FONT_PATH_TITLE = "Lyka/assets/font.ttf"
+FONT_PATH_META = "Lyka/assets/cfont.ttf"
+FALLBACK_PATH = "Lyka/assets/fallback.jpg"
 
 def truncate_text(text, font, max_width):
     if font.getlength(text) <= max_width:
