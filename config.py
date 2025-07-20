@@ -17,11 +17,11 @@ DOWNLOADS_DIR = "downloads"
 # Get your token from @BotFather on Telegram.
 BOT_TOKEN = getenv("BOT_TOKEN")
 # -------------------------------------------------------
-OWNER_USERNAME = getenv("OWNER_USERNAME","nitriic")
+OWNER_USERNAME = getenv("OWNER_USERNAME","Nikchil")
 # --------------------------------------------------------
 BOT_USERNAME = getenv("BOT_USERNAME","LykaRobot")
 # --------------------------------------------------------
-BOT_NAME = getenv("BOT_NAME", "Lyka")
+BOT_NAME = getenv("BOT_NAME", "BeatGuard")
 # ---------------------------------------------------------
 
 FAILED = "https://graph.org/file/40581c7048b1ee71209a2-3fc027862ecf64213d.jpg"
@@ -29,7 +29,7 @@ FAILED = "https://graph.org/file/40581c7048b1ee71209a2-3fc027862ecf64213d.jpg"
 # Get your mongo url from cloud.mongodb.com
 MONGO_DB_URI = getenv("MONGO_DB_URI", None)
 
-DURATION_LIMIT_MIN = int(getenv("DURATION_LIMIT", 17000))
+DURATION_LIMIT_MIN = int(getenv("DURATION_LIMIT", 99999))
 
 # Chat id of a group for logging bot's activities
 LOGGER_ID = int(getenv("LOGGER_ID", None))
