@@ -39,6 +39,11 @@ playtype = {}
 skipmode = {}
 mute = {}
 
+# Ensure a chat is connected and added to the DB
+async def connect_to_chat(chat_id: int):
+    if not await is_served_chat(chat_id):
+        await add_served_chat(chat_id)
+
 async def get_assistant_number(chat_id: int) -> str:
     assistant = assistantdict.get(chat_id)
     return assistant
