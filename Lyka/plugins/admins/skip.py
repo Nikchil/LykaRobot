@@ -9,7 +9,7 @@ from Lyka.utils.database import get_loop
 from Lyka.utils.decorators import AdminRightsCheck
 from Lyka.utils.inline import close_markup, stream_markup, telegram_markup
 from Lyka.utils.stream.autoclear import auto_clean
-from Lyka.utils.thumbnails import get_thumb
+from Lyka.utils.thumbnails import gen_thumb
 from config import BANNED_USERS
 
 
@@ -117,7 +117,7 @@ async def skip(cli, message: Message, _, chat_id):
         except:
             return await message.reply_text(_["call_6"])
         button = telegram_markup(_, chat_id)
-        img = await get_thumb(videoid)
+        img = await gen_thumb(videoid)
         run = await message.reply_photo(
             photo=img,
             caption=_["stream_1"].format(
