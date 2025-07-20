@@ -27,7 +27,7 @@ from Lyka.utils.inline import (
     telegram_markup_timer,
 )
 from Lyka.utils.stream.autoclear import auto_clean
-from Lyka.utils.thumbnails import get_thumb
+from Lyka.utils.thumbnails import gen_thumb
 from config import (
     BANNED_USERS,
     SOUNCLOUD_IMG_URL,
