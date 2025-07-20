@@ -20,6 +20,7 @@ BOT_USERNAME = getenv("BOT_USERNAME","LykaRobot")
 BOT_NAME = getenv("BOT_NAME", "Lyka")
 # ---------------------------------------------------------
 
+FAILED = "https://graph.org/file/40581c7048b1ee71209a2-3fc027862ecf64213d.jpg"
 
 # Get your mongo url from cloud.mongodb.com
 MONGO_DB_URI = getenv("MONGO_DB_URI", None)
